@@ -17,4 +17,24 @@ class CanMarkAttendance(BasePermission):
               ) or request.user.userprofile.is_hod or request.user.userprofile.is_coursehead or request.user.userprofile.is_classIncharge
 
 
-  
+class IsClassInchargeOrHod(BasePermission):
+    def has_permission(self, request, view):
+        user_profile = request.user.userprofile
+
+        # Check if the user has the necessary permissions
+        return user_profile.faculty and (
+            user_profile.faculty.hod.exists() or user_profile.faculty.classincharge.exists()
+        )
+
+class IsHod(BasePermission):
+    def has_permission(self, request, view):
+        profile = request.user.profile
+        return profile.faculty and profile.faculty.hod.exists()
+
+
+class IsAdminOrSuperuser(BasePermission):
+    message = "You do not have permission to perform this action."
+
+    def has_permission(self, request, view):
+        # Check if the user is an admin or superuser
+        return request.user.is_staff or request.user.is_superuser

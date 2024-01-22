@@ -7,7 +7,7 @@ from datetime import timedelta
 
 class UserProfile(models.Model):
     profileid = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='profile')
+    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='userprofile')
     name = models.CharField(max_length=255)
     email = models.EmailField(null=True,blank=True)
     phone = models.BigIntegerField(null=True,blank=True)

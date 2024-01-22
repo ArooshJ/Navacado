@@ -3,7 +3,7 @@ from rest_framework.response import Response # for rest framework api views
 from rest_framework.decorators import api_view,permission_classes,parser_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from .permissions import CanMarkAttendance
+from .permissions import CanMarkAttendance,IsAdminOrSuperuser,IsClassInchargeOrHod,IsHod
 from .models import Department, Faculty, Class, Batch, Student, Course,Enrollment, Lecture, Lab, Timetable, TimeTableSlot, LecAttendance, LabAttendance,UserProfile
 from .serializers import DepartmentSerializer,FacultySerializer,ClassSerializer,BatchSerializer,StudentSerializer,EnrollmentSerializer,CourseSerializer,LectureSerializer,LecAttendanceSerializer,LabSerializer,LabAttendanceSerializer,TimeTableSlotSerializer,TimetableSerializer,UserProfileSerializer
 # Create your views here.
@@ -61,8 +61,8 @@ def getDepartments(request):
 
 @api_view(['GET','PUT','PATCH','DELETE'])
 def crudDepartment(request,pk):
-    if not(request.user.userprofile.is_hod):
-      return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+   #  if not(request.user.userprofile.is_hod):
+   #    return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
         
     try:
       department = Department.objects.get(pk = pk)
@@ -70,9 +70,14 @@ def crudDepartment(request,pk):
         serializer = DepartmentSerializer(department)
         return Response(serializer.data)
       if request.method == 'DELETE':
+         if not (request.user.is_superuser):
+            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
          department.delete()
          return Response({'message': 'department deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+         if not request.user.userprofile.faculty and request.user.userprofile.faculty.hod:
+            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+        
          serializer = DepartmentSerializer(department,request.data,partial = request.method =='PATCH')
          if serializer.is_valid:
            serializer.save()
@@ -85,6 +90,7 @@ def crudDepartment(request,pk):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST']) 
+@permission_classes([IsAdminOrSuperuser])
 def createDepartment(request):
    Department = DepartmentSerializer(request.data)
    if Department.is_valid:
@@ -103,11 +109,14 @@ def getFaculties(request):
 @api_view(['GET','PATCH','DELETE'])
 def crudFaculty(request,pk):
    try:
+      profile = request.user.userprofile
       faculty = Faculty.objects.get(pk = pk)
       if request.method == 'GET':
         serializer = FacultySerializer(faculty)
         return Response(serializer.data)
       if request.method == 'DELETE':
+         if not (request.user.is_superuser):
+            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
          faculty.delete()
          return Response({'message': 'faculty deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
@@ -143,17 +152,25 @@ def getClasses(request):
 
 @api_view(['GET','PATCH','DELETE'])
 def crudClass(request,pk):
-   if not(request.user.userprofile.faculty.exists() or request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
-      return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+   
    try:
       cLass = Class.objects.get(pk = pk)
       if request.method == 'GET':
         serializer = ClassSerializer(cLass)
         return Response(serializer.data)
       if request.method == 'DELETE':
+         
+         if not(request.user.userprofile.faculty.exists() and (request.user.userprofile.faculty.hod.exists() or request.user.userprofile.faculty.incharge.exists())):
+             return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         
          cLass.delete()
          return Response({'message': 'cLass deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+      
       if request.method in ['PUT','PATCH']:
+
+         if not(request.user.userprofile.faculty.exists() and (request.user.userprofile.faculty.hod.exists() or request.user.userprofile.faculty.classincharge.exists())):
+           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         
          serializer = ClassSerializer(cLass,request.data,partial = request.method =='PATCH')
          if serializer.is_valid:
            serializer.save()
@@ -197,18 +214,26 @@ def getBatches(request):
 
 @api_view(['GET','PATCH','DELETE'])
 def crudBatch(request,pk):
-   if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
-      return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+   
    
    try:
+      profile = request.user.userprofile
       batch = Batch.objects.get(pk = pk)
       if request.method == 'GET':
         serializer = BatchSerializer(batch)
         return Response(serializer.data)
       if request.method == 'DELETE':
+         
+         if not (profile.faculty and (profile.faculty.classincharge.exists() or profile.faculty.hod.exists())):
+           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+        
          batch.delete()
          return Response({'message': 'batch deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+
+         if not (profile.faculty and (profile.faculty.classincharge.exists() or profile.faculty.hod.exists())):
+            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+
          serializer = BatchSerializer(batch,request.data,partial = request.method =='PATCH')
          if serializer.is_valid:
            serializer.save()
@@ -226,21 +251,23 @@ def crudBatchByClass():
 @api_view(['GET','PUT','PATCH','DELETE'])
 def RUDStudent(request,pk):
    try:
+      profile = request.user.userprofile
       student = Student.objects.get(pk = pk)
       if request.method == 'GET':
         serializer = StudentSerializer(student)
         return Response(serializer.data)
       if request.method == 'DELETE':
+         if not (request.user.is_superuser):
+            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
          student.delete()
          return Response({'message': 'Student deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+
          serializer = StudentSerializer(student,request.data,partial = request.method =='PATCH')
          if serializer.is_valid:
            serializer.save()
            return Response(serializer.data)
-      if request.method == 'DELETE':
-         student.delete()
-         return Response({'message': 'Post deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+      
 
    except Student.DoesNotExist:
       return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -256,6 +283,7 @@ def RUDStudent(request,pk):
 #    pass
 
 @api_view(['POST'])
+@permission_classes([IsAdminOrSuperuser])
 def createStudent(request):
    Student = StudentSerializer(request.data)
    if Student.is_valid:
@@ -300,6 +328,8 @@ def getStudentsByCondition(request,**kwargs):
    if(request.method == 'GET'):
      serializer = StudentSerializer(students,many=True)
    if(request.method == 'PATCH'):
+      if not (request.user.is_superuser or request.user.is_admin):
+         return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
       fields = request.data
       students.update(**fields)
       serializer = StudentSerializer(students,many=True)
@@ -322,14 +352,25 @@ def getCourses(request):
 @api_view(['GET','PATCH','DELETE'])
 def crudCourse(request,pk):
    try:
+      profile = request.user.userprofile
       course = Course.objects.get(pk = pk)
       if request.method == 'GET':
         serializer = CourseSerializer(course)
         return Response(serializer.data)
       if request.method == 'DELETE':
+         
+         #permission
+         if not (request.user.is_superuser or (profile.faculty and profile.faculty.head)):
+            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         
          course.delete()
          return Response({'message': 'Course deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+         #permission
+         if not (profile.faculty and (profile.faculty.hod or profile.faculty.head)):
+            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+
+
          serializer = CourseSerializer(course,request.data,partial = request.method =='PATCH')
          if serializer.is_valid:
            serializer.save()
@@ -342,6 +383,7 @@ def crudCourse(request,pk):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
   
 @api_view(['POST']) 
+@permission_classes([IsAuthenticated, IsHod])
 def createCourse(request):
    Course = CourseSerializer(request.data)
    if Course.is_valid:
@@ -377,30 +419,39 @@ def getLectures(request):
 @api_view(['GET','PATCH','DELETE'])
 def crudlec(request,pk):
    
-    try:
+   try:
+      
       lecture = Lecture.objects.get(pk = pk)
-      if not(request.user.userprofile.faculty == lecture.faculty or request.user.userprofile.is_hod or request.user.userprofile.is_coursehead or request.user.userprofile.is_classIncharge):
-          return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+      
          
       if request.method == 'GET':
         serializer = LectureSerializer(lecture)
         return Response(serializer.data)
       if request.method == 'DELETE':
+         #permission
+         if not (request.user.userprofile.faculty and(request.user.userprofile.faculty == lecture.faculty or request.user.userprofile.is_hod or request.user.userprofile.is_coursehead or request.user.userprofile.is_classIncharge)):
+          return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         
          lecture.delete()
          return Response({'message': 'Lecture deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+         #permission
+         if not (request.user.userprofile.faculty and(request.user.userprofile.faculty == lecture.faculty or request.user.userprofile.faculty.hod or request.user.userprofile.faculty.head or request.user.userprofile.faculty.incharge)):
+          return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         
          serializer = LectureSerializer(lecture,request.data,partial = request.method =='PATCH')
          if serializer.is_valid:
            serializer.save()
            return Response(serializer.data)
      
 
-    except Lecture.DoesNotExist:
+   except Lecture.DoesNotExist:
       return Response({'error': 'Lecture not found'}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
+   except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
   
 @api_view(['POST']) 
+@permission_classes([IsAuthenticated])
 def createLecture(request):
    Lecture = LectureSerializer(request.data)
    if Lecture.is_valid:
@@ -527,7 +578,8 @@ def getTimeTables(request):
 def crudTT():
    pass
 
-@api_view(['POST']) 
+@api_view(['POST'])
+@permission_classes([IsClassInchargeOrHod])
 def createTimeTable(request):
    TimeTable = TimetableSerializer(request.data)
    if TimeTable.is_valid:
@@ -538,21 +590,31 @@ def createTimeTable(request):
 @api_view(['GET','PUT','PATCH','DELETE'])
 def crudTimetable(request,pk):
     try:
+      profile = request.user.userprofile
       timetable = Timetable.objects.get(pk = pk)
-      if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
-        return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+      
 
       if request.method == 'GET':
         serializer = TimetableSerializer(timetable)
         return Response(serializer.data)
       if request.method == 'DELETE':
+
+         #permission
+         if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
+           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+
          timetable.delete()
          return Response({'message': 'timetable deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+         #permission
+         if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
+           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+    
          serializer = TimetableSerializer(timetable,request.data,partial = request.method =='PATCH')
          if serializer.is_valid:
            serializer.save()
            return Response(serializer.data)
+    
     except Timetable.DoesNotExist:
       return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
@@ -560,8 +622,8 @@ def crudTimetable(request,pk):
 
 
 def crudTTSlotbyDay():
-
    pass
+
 
 @api_view(['GET'])
 def getTimeTableSlots(request):
@@ -583,15 +645,22 @@ def createTimeTableSlot(request):
 def crudTimeTableSlot(request,pk):
     try:
       timeTableSlot = TimeTableSlot.objects.get(pk = pk)
-      if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
-        return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+      
       if request.method == 'GET':
         serializer = TimeTableSlotSerializer(timeTableSlot)
         return Response(serializer.data)
       if request.method == 'DELETE':
+         #permission
+         if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
+           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+    
          timeTableSlot.delete()
          return Response({'message': 'timeTableSlot deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+         #permission
+         if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
+           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         
          serializer = TimeTableSlotSerializer(timeTableSlot,request.data,partial = request.method =='PATCH')
          if serializer.is_valid:
            serializer.save()
