@@ -3,7 +3,8 @@ from .serializers import DepartmentSerializer,FacultySerializer,ClassSerializer,
 from rest_framework.permissions import BasePermission
 
 
-class CanMarkAttendance(BasePermission):
+
+class CanMarkAttendance(BasePermission):#useless
     message = "You arent authorized to mark attendance"
     def has_permission(self, request, view):
         l = request.data.get("Lecture")
@@ -30,6 +31,7 @@ class IsHod(BasePermission):
     def has_permission(self, request, view):
         profile = request.user.profile
         return profile.faculty and profile.faculty.hod.exists()
+
 
 
 class IsAdminOrSuperuser(BasePermission):

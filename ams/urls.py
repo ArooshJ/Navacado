@@ -4,14 +4,13 @@ from . import views
 
 urlpatterns = [
 
-    path('profiles/', views.getProfiles, name='get-profiles'),
-    path('profiles/<int:pk>/', views.crudProfile, name='crud-profile'),
-
+   
     # Departments
     path('departments/', views.getDepartments, name='get-departments'),
     path('departments/<int:pk>/', views.crudDepartment, name='crud-department'),
     path('departments/create/', views.createDepartment, name='create-department'),
-
+    
+    #students
     path('students/<int:pk>/', views.RUDStudent, name='crud-student'),
     path('students/create/', views.createStudent, name='create-student'),
     path('students/', views.getStudentsByCondition, name='filter-students'),
@@ -25,6 +24,7 @@ urlpatterns = [
     # Timetables
     path('timetables/', views.getTimeTables, name='get-timetables'),
     path('timetables/<int:pk>/', views.crudTimetable, name='crud-timetable'),
+    path('timetables/<int:pk>/leclabs/<int:lec_lab>/', views.getLecLabsPerCourseinTT, name='crud-timetable'),
     path('timetables/create/', views.createTimeTable, name='create-timetable'),
     
     # Profiles
@@ -68,12 +68,14 @@ urlpatterns = [
 
     # Lab Attendances
     path('labattendances/', views.getLabAttendance, name='get-lab-attendances'),
-    #path('labattendances/<int:pk>/', views.crudLabAttendance, name='crud-lab-attendance'),
+    path('labattendances/markatt/', views.MarkLabAttendance, name='crud-lab-attendance'),
     path('labattendances/create/', views.createLabAttendance, name='create-lab-attendance'),
-
+   
+   # LecAttendances
     path('lecattendances/', views.getLecAttendances, name='get-lec-attendances'),
-    #path('lecattendances/<int:pk>/', views.crudLecAttendance, name='crud-lec-attendance'),
+    path('lecattendances/markatt/', views.crudLecAttendance, name='crud-lec-attendance'),
     path('lecattendances/create/', views.createLecAttendance, name='create-lec-attendance'),
-
+    
+    
 
 ]

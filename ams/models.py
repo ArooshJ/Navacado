@@ -7,7 +7,7 @@ from datetime import timedelta
 
 class UserProfile(models.Model):
     profileid = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='userprofile')
+    user = models.OneToOneField(User,on_delete=models.CASCADE,related_name='userprofile')
     name = models.CharField(max_length=255)
     email = models.EmailField(null=True,blank=True)
     phone = models.BigIntegerField(null=True,blank=True)
@@ -29,7 +29,7 @@ class UserProfile(models.Model):
 class Department(models.Model):
     id = models.AutoField(primary_key=True)
     dname = models.CharField(max_length=255)
-    hod = models.ForeignKey('Faculty', on_delete=models.SET_NULL, null=True, blank=True, related_name='is_hod')
+    hod = models.OneToOneField('Faculty', on_delete=models.SET_NULL, null=True, blank=True, related_name='hod')
     def __str__(self):
         return self.dname
     
@@ -40,8 +40,8 @@ class Department(models.Model):
 
 class Faculty(models.Model):
     id = models.BigAutoField(primary_key=True)
-    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='faculty_members')
+    profile = models.OneToOneField(UserProfile, on_delete=models.CASCADE,related_name = 'faculty')
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='faculty')
     def __str__(self):
         return self.profile.name
 
@@ -51,7 +51,7 @@ class Class(models.Model):
     year = models.IntegerField()
     division = models.CharField(max_length=1)
     acad_year = models.CharField(max_length=10)
-    incharge = models.ForeignKey('Faculty',on_delete=models.SET_NULL, null=True, related_name= 'incharged_class')
+    incharge = models.OneToOneField('Faculty',on_delete=models.SET_NULL, null=True, related_name= 'incharged_class')
     cr = models.ForeignKey('Student', on_delete=models.SET_NULL, null=True, blank=True, related_name='class_representatives')
     def __str__(self):
         return f"{self.department}, {self.year}, {self.division}, {self.acad_year}"
@@ -69,9 +69,9 @@ class Batch(models.Model):
 
 class Student(models.Model):
     uid = models.BigAutoField(primary_key=True)
-    profile = models.ForeignKey(UserProfile,on_delete=models.CASCADE,related_name='student')
+    profile = models.OneToOneField(UserProfile,on_delete=models.CASCADE,related_name='student')
     joined_year = models.IntegerField()
-    class_field = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='students')
+    class_field = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='student')
     batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='students', null=True, blank=True)
     def __str__(self):
         return self.profile.name
@@ -80,7 +80,7 @@ class Course(models.Model):
     cid = models.AutoField(primary_key=True)
     cname = models.CharField(max_length=255)
     semester = models.IntegerField()
-    head = models.ForeignKey(Faculty, on_delete=models.SET_NULL, null=True, blank=True, related_name='head_of_courses')
+    head = models.OneToOneField(Faculty, on_delete=models.SET_NULL, null=True, blank=True, related_name='head')
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='courses')
     def __str__(self):
         return self.cname
@@ -109,6 +109,9 @@ class Lecture(models.Model):
                 sid = s,
                 lecid = self,
             )
+    def __str__(self):
+            Days = {1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',7:'Sun'}
+            return f"{self.course}, {self.class_field}, {self.date}, {self.start_time}"
 
 
 class Lab(models.Model):
@@ -122,7 +125,7 @@ class Lab(models.Model):
     room = models.IntegerField(null = True, blank= True)
     def save(self,*args,**kwargs):
         super().save(*args,**kwargs)
-        batchList = Student.objects.filter(Batch = self.batch)
+        batchList = Student.objects.filter(batch = self.batch)
         for s in batchList:
             print(s.profile.name)
             LabAttendance.objects.create(
@@ -148,7 +151,10 @@ class TimeTableSlot(models.Model):
     faculty = models.ForeignKey(Faculty, on_delete=models.SET_NULL, null=True, blank=True)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, null=True, blank=True)
     lec_lab = models.BooleanField(default=True) # = 1 for lec and 0 for labs
-
+    batch = models.ForeignKey(Batch, on_delete = models.CASCADE,null = True,blank=True)
+    def __str__(self):
+        Days = {1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',7:'Sun'}
+        return f"{self.course}, {Days[self.day]}, {self.start_time}"
     def save(self, *args, **kwargs):
         super().save(self,*args,**kwargs)
         print('saved self')
@@ -158,7 +164,7 @@ class TimeTableSlot(models.Model):
              if self.lec_lab:
                 Lecture.objects.create(
                     course=self.course,
-                    class_field=self.ttid.class_field,
+                    class_field= self.ttid.class_field,
                     faculty=self.faculty,
                     date=current_date,
                     start_time=self.start_time,
@@ -172,7 +178,7 @@ class TimeTableSlot(models.Model):
              else:
                 Lab.objects.create(
                     course=self.course,
-                    class_field=self.ttid.class_field,
+                    batch=self.batch,
                     faculty=self.faculty,
                     date=current_date,
                     start_time=self.start_time,
@@ -180,12 +186,15 @@ class TimeTableSlot(models.Model):
                     
                 )
                 print('creating lab')
+                current_date += timedelta(days=7)
+
                 
 
                 # Increment current_date by 7 days for the next week
             current_date += timedelta(days=7)
 
          
+
 
 
 class LecAttendance(models.Model):

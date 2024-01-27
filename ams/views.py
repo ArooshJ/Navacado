@@ -5,10 +5,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from .permissions import CanMarkAttendance,IsAdminOrSuperuser,IsClassInchargeOrHod,IsHod
 from .models import Department, Faculty, Class, Batch, Student, Course,Enrollment, Lecture, Lab, Timetable, TimeTableSlot, LecAttendance, LabAttendance,UserProfile
+from django.db.models import *
 from .serializers import DepartmentSerializer,FacultySerializer,ClassSerializer,BatchSerializer,StudentSerializer,EnrollmentSerializer,CourseSerializer,LectureSerializer,LecAttendanceSerializer,LabSerializer,LabAttendanceSerializer,TimeTableSlotSerializer,TimetableSerializer,UserProfileSerializer
 # Create your views here.
-
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getProfiles(request):
    UserProfileFilters = {}
    UserProfiles = UserProfile.objects.filter(**UserProfileFilters)
@@ -17,6 +18,7 @@ def getProfiles(request):
    pass # get all profiles
 
 @api_view(['GET','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudProfile(request,pk):
    try:
       profile = UserProfile.objects.get(pk = pk)
@@ -24,17 +26,23 @@ def crudProfile(request,pk):
         serializer = UserProfileSerializer(profile)
         return Response(serializer.data)
       if request.method == 'DELETE':
-         if request.user != profile.user:
+         
+         permission  = request.user == profile.user or request.user.is_superuser 
+         if not permission:
             return Response({'error': 'You are not allowed to perform this action on this profile'}, status=status.HTTP_403_FORBIDDEN)
+         
          profile.delete()
          return Response({'message': 'profile deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
-         if request.user != profile.user:
+         
+         permission = (request.user == profile.user) or request.user.is_superuser   
+         if not permission:
             return Response({'error': 'You are not allowed to perform this action on this profile'}, status=status.HTTP_403_FORBIDDEN)
          allowed_fields = ['name', 'email', 'phone']  # Replace with your actual field names
-         data = {k: v for k, v in request.data.items() if k in allowed_fields}
+         
+         data = {k: v for k, v in request.data.items() if k in allowed_fields} 
          serializer = UserProfileSerializer(profile,data = data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
      
@@ -45,13 +53,18 @@ def crudProfile(request,pk):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST']) 
+@permission_classes([IsAuthenticated])
 def createUserProfile(request):
+   permission = request.user.is_superuser
+   if not permission:
+         return Response({'error': 'You are not allowed to perform this action on this profile'}, status=status.HTTP_403_FORBIDDEN)
    UserProfile = UserProfileSerializer(request.data)
-   if UserProfile.is_valid:
+   if UserProfile.is_valid():
        UserProfile.save()
        return Response({'message':'UserProfile created Successfully'},status=status.HTTP_201_CREATED)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getDepartments(request):
    DepartmentFilters = {}
    Departments = Department.objects.filter(**DepartmentFilters)
@@ -60,6 +73,7 @@ def getDepartments(request):
    pass # get a department list
 
 @api_view(['GET','PUT','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudDepartment(request,pk):
    #  if not(request.user.userprofile.is_hod):
    #    return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
@@ -70,35 +84,48 @@ def crudDepartment(request,pk):
         serializer = DepartmentSerializer(department)
         return Response(serializer.data)
       if request.method == 'DELETE':
-         if not (request.user.is_superuser):
+         #permission
+         permission = request.user.is_superuser
+         if not permission:
             return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         
          department.delete()
          return Response({'message': 'department deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
-         if not request.user.userprofile.faculty and request.user.userprofile.faculty.hod:
-            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         #permission
         
+         print('patch started')
+         permission = (request.user.is_superuser) or (request.user.userprofile and (request.user.userprofile.faculty and request.user.userprofile.faculty.hod and request.user.userprofile.faculty.hod == department) )
+         if not permission:
+            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         print('permission passd')
          serializer = DepartmentSerializer(department,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         print(serializer.is_valid())
+         if serializer.is_valid():
+           print("valid")
            serializer.save()
            return Response(serializer.data)
-     
+         print("Not Valid")
+         return Response({'error':str(serializer.errors)},status = status.HTTP_206_PARTIAL_CONTENT)
 
     except Department.DoesNotExist:
+      print('deptnot exists')
       return Response({'error': 'Department not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
+        print('othererr')
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST']) 
 @permission_classes([IsAdminOrSuperuser])
 def createDepartment(request):
    Department = DepartmentSerializer(request.data)
-   if Department.is_valid:
+   if Department.is_valid():
        Department.save()
        return Response({'message':'Department created Successfully'},status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getFaculties(request):
    FacultyFilters = {}
    Facultys = Faculty.objects.filter(**FacultyFilters)
@@ -107,6 +134,7 @@ def getFaculties(request):
    pass # get all Faculties list
 
 @api_view(['GET','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudFaculty(request,pk):
    try:
       profile = request.user.userprofile
@@ -115,13 +143,22 @@ def crudFaculty(request,pk):
         serializer = FacultySerializer(faculty)
         return Response(serializer.data)
       if request.method == 'DELETE':
-         if not (request.user.is_superuser):
+
+         #permission
+         permission =  (request.user.is_superuser)
+         if not permission:
             return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+         
          faculty.delete()
          return Response({'message': 'faculty deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+        
+         permission = (request.user.userprofile and request.user.userprofile.faculty == faculty)
+         if not permission:
+             return Response({'error' :'You are not allowed to perform this action'},status =status.HTTP_403_FORBIDDEN)
+
          serializer = FacultySerializer(faculty,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
    
@@ -135,13 +172,18 @@ def crudClassIncharges():
    pass
 
 @api_view(['POST']) 
+@permission_classes([IsAuthenticated])
 def createFaculty(request):
+   permission = request.user.is_superuser
+   if not permission:
+             return Response({'error' :'You are not allowed to perform this action'},status =status.HTTP_403_FORBIDDEN)
    Faculty = FacultySerializer(request.data)
-   if Faculty.is_valid:
+   if Faculty.is_valid():
        Faculty.save()
        return Response({'message':'Faculty created Successfully'},status=status.HTTP_201_CREATED)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getClasses(request):
    ClassFilters = {}
    Classs = Class.objects.filter(**ClassFilters)
@@ -151,6 +193,7 @@ def getClasses(request):
    pass # Get all classes
 
 @api_view(['GET','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudClass(request,pk):
    
    try:
@@ -160,19 +203,21 @@ def crudClass(request,pk):
         return Response(serializer.data)
       if request.method == 'DELETE':
          
-         if not(request.user.userprofile.faculty.exists() and (request.user.userprofile.faculty.hod.exists() or request.user.userprofile.faculty.incharge.exists())):
+         permission = (request.user.userprofile.faculty.exists() and (request.user.userprofile.faculty.hod.exists() or request.user.userprofile.incharge and (request.user.userprofile.faculty.incharge == cLass.incharge)))
+         if not permission:
              return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
          
          cLass.delete()
          return Response({'message': 'cLass deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       
       if request.method in ['PUT','PATCH']:
-
-         if not(request.user.userprofile.faculty.exists() and (request.user.userprofile.faculty.hod.exists() or request.user.userprofile.faculty.classincharge.exists())):
+         
+         permission = (request.user.userprofile.faculty.exists() and (request.user.userprofile.faculty.hod.exists() or request.user.userprofile.faculty.classincharge.exists()))
+         if not permission:
            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
          
          serializer = ClassSerializer(cLass,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
      
@@ -183,9 +228,13 @@ def crudClass(request,pk):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST']) 
+@permission_classes([IsAuthenticated])
 def createClass(request):
    Class = ClassSerializer(request.data)
-   if Class.is_valid:
+   permission = request.user.is_superuser or (request.user.userprofile and request.user.userprofile.faculty and request.userprofile.faculty.hod and request.userprofile.faculty.hod == Class.department)
+   if not permission:
+             return Response({'error' :'You are not allowed to perform this action'},status =status.HTTP_403_FORBIDDEN)
+   if Class.is_valid():
        Class.save()
        return Response({'message':'Class created Successfully'},status=status.HTTP_201_CREATED) 
 
@@ -193,19 +242,26 @@ def crudClassesbyYear():
    pass
 def crudClassesbyDept():
    pass
-
-
 def crudAllBatches():
-   pass
+   pass    
 
 @api_view(['POST']) 
+@permission_classes([IsAuthenticated])
+
 def createBatch(request):
+    
    Batch = BatchSerializer(request.data)
-   if Batch.is_valid:
+   profile = request.user.userprofile
+   permission = request.user.is_superuser or (profile and profile.faculty and profile.faculty.incharge and profile.faculty.incharge == Batch.class_field.incharge)
+
+   if not permission:
+             return Response({'error' :'You are not allowed to perform this action'},status =status.HTTP_403_FORBIDDEN)
+   if Batch.is_valid():
        Batch.save()
        return Response({'message':'Batch created Successfully'},status=status.HTTP_201_CREATED)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getBatches(request):
    BatchFilters = {}
    Batchs = Batch.objects.filter(**BatchFilters)
@@ -213,6 +269,7 @@ def getBatches(request):
    return Response(serializer.data)
 
 @api_view(['GET','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudBatch(request,pk):
    
    
@@ -224,18 +281,21 @@ def crudBatch(request,pk):
         return Response(serializer.data)
       if request.method == 'DELETE':
          
-         if not (profile.faculty and (profile.faculty.classincharge.exists() or profile.faculty.hod.exists())):
+         permission = profile and (profile.faculty and ((profile.faculty.incharge and profile.faculty.incharge == batch.class_field.incharge ) or( profile.faculty.hod and profile.faculty.hod == batch.class_field.department))) or request.user.is_superuser
+         if not permission:
            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
         
          batch.delete()
          return Response({'message': 'batch deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+          
+         permission = profile and (profile.faculty and ((profile.faculty.incharge and profile.faculty.incharge == batch.class_field.incharge ) or( profile.faculty.hod and profile.faculty.hod == batch.class_field.department))) or request.user.is_superuser
 
-         if not (profile.faculty and (profile.faculty.classincharge.exists() or profile.faculty.hod.exists())):
+         if not permission:
             return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
 
          serializer = BatchSerializer(batch,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
      
@@ -249,6 +309,7 @@ def crudBatchByClass():
    pass
 
 @api_view(['GET','PUT','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def RUDStudent(request,pk):
    try:
       profile = request.user.userprofile
@@ -257,14 +318,17 @@ def RUDStudent(request,pk):
         serializer = StudentSerializer(student)
         return Response(serializer.data)
       if request.method == 'DELETE':
-         if not (request.user.is_superuser):
+         
+         permission = (request.user.is_superuser)
+         if not permission:
             return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
          student.delete()
          return Response({'message': 'Student deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+     
       if request.method in ['PUT','PATCH']:
-
+          
          serializer = StudentSerializer(student,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
       
@@ -286,7 +350,7 @@ def RUDStudent(request,pk):
 @permission_classes([IsAdminOrSuperuser])
 def createStudent(request):
    Student = StudentSerializer(request.data)
-   if Student.is_valid:
+   if Student.is_valid():
        Student.save()
        return Response({'message':'Student created Successfully'},status=status.HTTP_201_CREATED)
    pass # also returns timetable of the class of that student, total lecs of the class of that student in the sem(as of valid tt), total he has attended, total not attended
@@ -296,6 +360,7 @@ def createStudent(request):
 
 
 @api_view(['GET','PATCH'])
+@permission_classes([IsAuthenticated])
 def getStudentsByCondition(request,**kwargs):
    studentFilters = {}
    if 'batch_id' in request.query_params:
@@ -342,6 +407,7 @@ def getStudentsByCondition(request,**kwargs):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getCourses(request):
    CourseFilters = {}
    courses = Course.objects.filter(**CourseFilters)
@@ -350,6 +416,7 @@ def getCourses(request):
 
 
 @api_view(['GET','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudCourse(request,pk):
    try:
       profile = request.user.userprofile
@@ -360,22 +427,24 @@ def crudCourse(request,pk):
       if request.method == 'DELETE':
          
          #permission
-         if not (request.user.is_superuser or (profile.faculty and profile.faculty.head)):
+         permission =  (request.user.is_superuser or (profile.faculty and profile.faculty.hod and profile.faculty.hod == course.department))
+         if not permission:
             return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
          
          course.delete()
          return Response({'message': 'Course deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
          #permission
-         if not (profile.faculty and (profile.faculty.hod or profile.faculty.head)):
+         permission =  (profile.faculty and (profile.faculty.hod or (profile.faculty.head and profile.faculty.head == course)))
+         if not permission:
             return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
 
 
          serializer = CourseSerializer(course,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
-   
+         return Response({'error':str(serializer.errors)},status = status.HTTP_400_BAD_REQUEST)
 
    except Course.DoesNotExist:
       return Response({'error': 'Faculty not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -386,11 +455,17 @@ def crudCourse(request,pk):
 @permission_classes([IsAuthenticated, IsHod])
 def createCourse(request):
    Course = CourseSerializer(request.data)
-   if Course.is_valid:
+   profile = request.user.userprofile
+   permission = request.user.is_superuser or (profile.faculty and (profile.faculty.hod and profile.faculty.hod == Course.department))
+   if not permission:
+             return Response({'error' :'You are not allowed to perform this action'},status =status.HTTP_403_FORBIDDEN)
+   if Course.is_valid():
        Course.save()
        return Response({'message':'Course created Successfully'},status=status.HTTP_201_CREATED)
-
+   return Response({'error':str(Course.errors)},status = status.HTTP_400_BAD_REQUEST)
+   
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getEnrollments(request):
    EnrollmentFilters = {}
    enrollments = Enrollment.objects.filter(**EnrollmentFilters)
@@ -398,9 +473,11 @@ def getEnrollments(request):
    return Response(serializer.data)
 
 @api_view(['POST']) 
+@permission_classes([IsAuthenticated])
 def createEnrollment(request):
+   
    Enrollment = EnrollmentSerializer(request.data)
-   if Enrollment.is_valid:
+   if Enrollment.is_valid():
        Enrollment.save()
        return Response({'message':'Enrollment created Successfully'},status=status.HTTP_201_CREATED)
    pass
@@ -409,6 +486,7 @@ def crudEnrollment():
    pass
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getLectures(request): 
    LectureFilters = {}
    Lectures = Lecture.objects.filter(**LectureFilters)
@@ -417,30 +495,34 @@ def getLectures(request):
    pass # get all Lecs, with conditions
 
 @api_view(['GET','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudlec(request,pk):
    
    try:
       
       lecture = Lecture.objects.get(pk = pk)
-      
+      profile = request.user.userprofile
          
       if request.method == 'GET':
         serializer = LectureSerializer(lecture)
         return Response(serializer.data)
       if request.method == 'DELETE':
          #permission
-         if not (request.user.userprofile.faculty and(request.user.userprofile.faculty == lecture.faculty or request.user.userprofile.is_hod or request.user.userprofile.is_coursehead or request.user.userprofile.is_classIncharge)):
+
+         permission = request.user.is_superuser or (profile and (profile.faculty and ((profile.faculty == lecture.faculty) or (profile.faculty.hod and profile.faculty.hod == lecture.faculty.department) or (profile.faculty.incharge and profile.faculty.incharge == lecture.class_field.incharge))))
+         if not permission :
           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
          
          lecture.delete()
          return Response({'message': 'Lecture deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
          #permission
-         if not (request.user.userprofile.faculty and(request.user.userprofile.faculty == lecture.faculty or request.user.userprofile.faculty.hod or request.user.userprofile.faculty.head or request.user.userprofile.faculty.incharge)):
+         permission = request.user.is_superuser or (profile and (profile.faculty and ((profile.faculty == lecture.faculty) or (profile.faculty.hod and profile.faculty.hod == lecture.faculty.department) or (profile.faculty.incharge and profile.faculty.incharge == lecture.class_field.incharge))))
+         if not permission:
           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
          
          serializer = LectureSerializer(lecture,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
      
@@ -453,9 +535,18 @@ def crudlec(request,pk):
 @api_view(['POST']) 
 @permission_classes([IsAuthenticated])
 def createLecture(request):
-   Lecture = LectureSerializer(request.data)
-   if Lecture.is_valid:
-       Lecture.save()
+   try:
+      profile = request.user.profile
+
+   except UserProfile.DoesNotExist:
+      return Response({'error' : 'please sign in '}, status= status.HTTP_403_FORBIDDEN)
+   lecture = LectureSerializer(request.data)
+   permission = request.user.is_superuser or (profile and (profile.faculty and ((profile.faculty == lecture.faculty) or (profile.faculty.hod and profile.faculty.hod == lecture.faculty.department) or (profile.faculty.incharge and profile.faculty.incharge == lecture.class_field.incharge))))
+   if not(permission):
+      return Response({'error' : 'You are not allowed to perform this action'}, status = status.HTTP_403_FORBIDDEN)
+   
+   if lecture.is_valid():
+       lecture.save()
        return Response({'message':'Lecture created Successfully'},status=status.HTTP_201_CREATED)
 # def crudLecbyRoom():
 #    pass
@@ -466,6 +557,7 @@ def CountLecsperCourseofaClass():
    pass
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getLabs(request):
    LabFilters = {}
    Labs = Lab.objects.filter(**LabFilters)
@@ -474,18 +566,27 @@ def getLabs(request):
    pass # get all Labs
 
 @api_view(['GET','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudExtraLab(request,pk):
    try:
       lab = Lab.objects.get(pk = pk)
+      profile = request.user.userprofile
       if request.method == 'GET':
         serializer = LabSerializer(lab)
         return Response(serializer.data)
       if request.method == 'DELETE':
+         permission = (profile and(profile.faculty and ((profile.faculty == lab.faculty) or (profile.faculty.hod and profile.faculty.head == lab.faculty.department) or (profile.faculty.head and profile.faculty.head == lab.course))))
+         if not permission:
+             return Response({'error' :'You are not allowed to perform this action'},status =status.HTTP_403_FORBIDDEN)
          lab.delete()
          return Response({'message': 'lab deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
+         permission = (profile and(profile.faculty and ((profile.faculty == lab.faculty) or (profile.faculty.hod and profile.faculty.head == lab.faculty.department) or (profile.faculty.head and profile.faculty.head == lab.course))))
+         if not permission:
+             return Response({'error' :'You are not allowed to perform this action'},status =status.HTTP_403_FORBIDDEN)
+    
          serializer = LabSerializer(lab,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
    except Lab.DoesNotExist:
@@ -502,30 +603,69 @@ def crudExtraLab(request,pk):
 # def crudLabsbyCourse():
 #    pass
 @api_view(['POST']) 
+@permission_classes([IsAuthenticated])
 def createLab(request):
    Lab = LabSerializer(request.data)
-   if Lab.is_valid:
+   if Lab.is_valid():
        Lab.save()
        return Response({'message':'Lab created Successfully'},status=status.HTTP_201_CREATED)
 def CountLabsperCourseofaClass():
    pass
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getLecAttendances(request):
-   LecAttendanceFilters = {}
-   LecAttendances = LecAttendance.objects.filter(**LecAttendanceFilters)
+   Filters = {}
+   if('sid' in request.query_params):
+    try:
+      s = request.query_params['sid']
+      Filters['sid'] = int(s)
+    except ValueError:
+       return Response("Invalid student id. It should be an integer.", status=400)
+   LecAttendances = LecAttendance.objects.filter(**Filters)
    serializer = LecAttendanceSerializer(LecAttendances,many=True)
    return Response(serializer.data)
 
-@api_view(['PATCH','PUT'])
-@permission_classes([CanMarkAttendance])
+@api_view(['GET','PATCH','PUT'])
+#@permission_classes([CanMarkAttendance])
 def crudLecAttendance(request):
-   lec = request.data.get("Lecture")
-   Attendance = request.data.get("Attendance",{})
-   serializer = LecAttendanceSerializer(Attendance, many = True,partial = request.method == 'PATCH')
-   if serializer.is_valid():
-      serializer.save()
-      return Response({"message": "Attendance updated successfully"}, status=200)
+   filters = {}
+   if('lec' in request.query_params):
+    try:
+      lec = request.query_params['lec']
+      filters['lecid'] = int(lec)
+      print("filters updated")
+    except ValueError as e:
+       return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+   try:
+    Att = LecAttendance.objects.filter(**filters)
+    present_ids = request.data.get('present_ids',[])
+    PresentAtt = Att.filter(sid__in= present_ids)
+    Lect = Lecture.objects.get(pk = int(lec))
+    print('filtered successfully')
+   except Exception as e:
+      return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
+   
+   
+   serializer = LecAttendanceSerializer(Att, many = True)
+   if request.method == 'GET':
+      return Response(serializer.data) 
+   
+   if request.method == 'PATCH': 
+    profile = request.user.userprofile
+    lecture = Lect
+    permission = request.user.is_superuser or (profile and (profile.faculty and ((profile.faculty == lecture.faculty) or (profile.faculty.hod and profile.faculty.hod == lecture.faculty.department) or (profile.faculty.incharge and profile.faculty.incharge == lecture.class_field))))
+    if not permission:
+             return Response({'error' :'You are not allowed to perform this action'},status =status.HTTP_403_FORBIDDEN)
+    try:
+       stat = request.data.get('present')
+       PresentAtt.update(present = stat)
+       serializer = LecAttendanceSerializer(PresentAtt, many = True)
+       return Response(serializer.data)
+
+    except Exception as e:
+       return Response({'error':str(e)},status = status.HTTP_400_BAD_REQUEST)
+    
 
     # If validation fails, return an error response
    return Response(serializer.errors, status=400)
@@ -534,41 +674,91 @@ def crudLecAttendance(request):
 # def crudLecAttendancebyStudent():
 #    pass
 @api_view(['POST']) 
+@permission_classes([IsAdminOrSuperuser])
 def createLecAttendance(request):
+
    LecAttendance = LecAttendanceSerializer(request.data)
-   if LecAttendance.is_valid:
+   profile = request.user.userprofile
+
+   if LecAttendance.is_valid():
        LecAttendance.save()
        return Response({'message':'LecAttendance created Successfully'},status=status.HTTP_201_CREATED)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getLabAttendance(request):
-   LabAttendanceFilters = {}
-   LabAttendances = LabAttendance.objects.filter(**LabAttendanceFilters)
+   Filters = {}
+   if('sid' in request.query_params):
+    try:
+      s = request.query_params['sid']
+      Filters['sid'] = int(s)
+    except ValueError:
+       return Response("Invalid student id. It should be an integer.", status=400)
+   LabAttendances = LabAttendance.objects.filter(**Filters)
    serializer = LabAttendanceSerializer(LabAttendances,many=True)
    return Response(serializer.data) # get attendance of all students in a particular lab
 # def crudLabAttendancebyBatch():
+
 #    pass # get attendance of all students in a particular batch
-@api_view(['PATCH'])
-@permission_classes([CanMarkAttendance])
-def crudLabAttendance(request):
-  
-   serializer = LabAttendanceSerializer(request.data, many = True,partial = request.method == 'PATCH')
-   if serializer.is_valid():
-      serializer.save()
-      return Response({"message": "Attendance updated successfully"}, status=200)
+@api_view(['GET','PATCH'])
+@permission_classes([IsAuthenticated])
+def MarkLabAttendance(request):
+   print('entered view')
+   filters = {}
+    
+   if('lab' in request.query_params):
+     try:
+       labid = request.query_params['lab']
+       filters['labid'] = int(labid) 
+     except ValueError:
+       return Response("Invalid class It should be an integer.", status=400)
+   
+   try:
+    Att = LabAttendance.objects.filter(**filters)
+    #print(Att)
+    PresentIds = request.data.get('present_ids',[])
+    PresentAtt = Att.filter(sid__in= PresentIds)
+    print(filters)
+    if filters['labid']:
+      lab = Lab.objects.get(pk = filters['labid'])
+      print(lab)
+
+   except Exception as e:
+      return Response({'error':str(e)},status = status.HTTP_400_BAD_REQUEST)
+   serializer = LabAttendanceSerializer(Att, many = True)
+   if(request.method == 'GET'):
+      return Response(serializer.data)
+      
+   if request.method == 'PATCH':
+      profile = request.user.userprofile
+      permission = request.user.is_superuser or (profile and (profile.faculty and ((profile.faculty == lab.faculty) or (profile.faculty.hod and profile.faculty.hod == lab.faculty.department) or (profile.faculty.incharge and profile.faculty.incharge == lab.class_field.incharge) or (profile.faculty.head and profile.faculty.head == lab.course))))
+      if not permission:
+             return Response({'error' :'You are not allowed to perform this action'},status =status.HTTP_403_FORBIDDEN)
+      
+      try:
+       stat = request.data.get('present')
+       PresentAtt.update(present = stat)
+       serializer = LabAttendanceSerializer(PresentAtt, many = True)
+       return Response(serializer.data)
+
+      except Exception as e:
+       return Response({'error':str(e)},status = status.HTTP_400_BAD_REQUEST)
+     
 
     # If validation fails, return an error response
    return Response(serializer.errors, status=400) # mark attendance of a student in labs
 # def crudLabAttendancebyStudent():
 #    pass
 @api_view(['POST']) 
+@permission_classes([IsAdminOrSuperuser])
 def createLabAttendance(request):
    LabAttendance = LabAttendanceSerializer(request.data)
-   if LabAttendance.is_valid:
+   if LabAttendance.is_valid():
        LabAttendance.save()
        return Response({'message':'LabAttendance created Successfully'},status=status.HTTP_201_CREATED)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getTimeTables(request):
    TimetableFilters = {}
    Timetables = Timetable.objects.filter(**TimetableFilters)
@@ -581,13 +771,21 @@ def crudTT():
 @api_view(['POST'])
 @permission_classes([IsClassInchargeOrHod])
 def createTimeTable(request):
+   profile = request.user.userprofile
    TimeTable = TimetableSerializer(request.data)
-   if TimeTable.is_valid:
+   permission = profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == TimeTable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == TimeTable.class_field)))
+   
+   if not permission:
+           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+   if TimeTable.is_valid():
        TimeTable.save()
        return Response({'message':'TimeTable created Successfully'},status=status.HTTP_201_CREATED)
+   return Response({'error':str(TimeTable.errors)},status = status.HTTP_400_BAD_REQUEST)
+   
 
 
 @api_view(['GET','PUT','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudTimetable(request,pk):
     try:
       profile = request.user.userprofile
@@ -600,20 +798,25 @@ def crudTimetable(request,pk):
       if request.method == 'DELETE':
 
          #permission
-         if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
+         permission = profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == timetable.class_field)))
+         if not permission:
            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
 
          timetable.delete()
          return Response({'message': 'timetable deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
          #permission
-         if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
+         permission = profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == timetable.class_field)))
+         if not permission:
+           
            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
     
          serializer = TimetableSerializer(timetable,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
+         return Response({'error':str(serializer.errors)},status = status.HTTP_400_BAD_REQUEST)
+         
     
     except Timetable.DoesNotExist:
       return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -626,6 +829,7 @@ def crudTTSlotbyDay():
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getTimeTableSlots(request):
    TimetableSlotFilters = {}
    TimetableSlots = TimeTableSlot.objects.filter(**TimetableSlotFilters)
@@ -634,41 +838,88 @@ def getTimeTableSlots(request):
 
 
 @api_view(['POST']) 
+@permission_classes([IsAuthenticated])
 def createTimeTableSlot(request):
+   profile = request.user.userprofile
    TimeTableSlot = TimeTableSlotSerializer(request.data)
-   if TimeTableSlot.is_valid:
+   permission = profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == TimeTableSlot.timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == TimeTableSlot.timetable.class_field)))
+   if not permission:
+           return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+   if TimeTableSlot.is_valid():
        TimeTableSlot.save()
        return Response({'message':'TimeTableSlot created Successfully'},status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET','PUT','PATCH','DELETE'])
+@permission_classes([IsAuthenticated])
 def crudTimeTableSlot(request,pk):
     try:
       timeTableSlot = TimeTableSlot.objects.get(pk = pk)
-      
-      if request.method == 'GET':
+      profile = request.user.userprofile
+      if request.method == 'GET': 
         serializer = TimeTableSlotSerializer(timeTableSlot)
         return Response(serializer.data)
       if request.method == 'DELETE':
          #permission
-         if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
+         permission = profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == timeTableSlot.timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == timeTableSlot.timetable.class_field)))
+         if not permission:
            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
     
          timeTableSlot.delete()
          return Response({'message': 'timeTableSlot deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
          #permission
-         if not(request.user.userprofile.is_hod or request.user.userprofile.is_classIncharge):
+         permission = profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == timeTableSlot.timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == timeTableSlot.timetable.class_field)))
+         if not permission:
            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
+           
          
          serializer = TimeTableSlotSerializer(timeTableSlot,request.data,partial = request.method =='PATCH')
-         if serializer.is_valid:
+         if serializer.is_valid():
            serializer.save()
            return Response(serializer.data)
     except TimeTableSlot.DoesNotExist:
       return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def getLecLabsPerCourseinTT(request,pk,lec_lab):
+   filters = {}
+   tt = Timetable.objects.get(pk=pk)
+   dateCondition = Q(date__gte = tt.valid_from) and Q(date__lte = tt.valid_till)
+   #print('good till condition')
+   lecsWithinthisTT = Lecture.objects.filter(dateCondition)
+   labsWithinthisTT = Lab.objects.filter(dateCondition)
+   #print('err here?')
+   
+   if('course' in request.query_params):
+    try:
+      c = request.query_params['course']
+      filters['course'] = int(c)
+    except ValueError:
+       return Response("Invalid student id. It should be an integer.", status=400)
+   
+   # 1 = lec, lab = 0
+   if(lec_lab):
+      op = lecsWithinthisTT.filter(**filters)
+      serializer = LectureSerializer(op,many=True)
+     # print('err here')
+      return Response(serializer.data)
+   else:
+      if('batch' in request.query_params):
+        try:
+         c = request.query_params['batch']
+         filters['batch'] = int(c)
+        except ValueError:
+          return Response("Invalid student id. It should be an integer.", status=400)
+      op = labsWithinthisTT.filter(**filters)
+      serializer = LabSerializer(op,many=True)
+      return Response(serializer.data)
+
+
+
 
 
 
