@@ -978,5 +978,5 @@ urlpatterns = [
     path('lectures/course/<int:course_id>/room/<int:room_number>/', views.lecture_list, name='lecture-list-by-course-and-room'),
 ]
 
-
+Something to test git
 '''
