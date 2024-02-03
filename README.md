@@ -1,0 +1,1 @@
+Navacado is a College attendance management system which helps track students' attendance in various lectures and labs which may be of different courses. This also allows creation of lectures based on TimeTabless
