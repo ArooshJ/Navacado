@@ -12,11 +12,11 @@ class UserProfile(models.Model):
     email = models.EmailField(null=True,blank=True)
     phone = models.BigIntegerField(null=True,blank=True)
     date_of_birth = models.DateField()
-    is_cr = models.BooleanField(default=False)
-    is_br = models.BooleanField(default=False)
-    is_hod = models.BooleanField(default=False)
-    is_coursehead = models.BooleanField(default=False)
-    is_classIncharge = models.BooleanField(default=False)
+    # is_cr = models.BooleanField(default=False)
+    # is_br = models.BooleanField(default=False)
+    # is_hod = models.BooleanField(default=False)
+    # is_coursehead = models.BooleanField(default=False)
+    # is_classIncharge = models.BooleanField(default=False)
     
     def __str__(self):
         return self.name
@@ -33,9 +33,9 @@ class Department(models.Model):
     def __str__(self):
         return self.dname
     
-    def save(self,*args,**kwargs):
-        super().save(*args,**kwargs)
-        self.hod.profile.is_hod = True
+    # def save(self,*args,**kwargs):
+    #     super().save(*args,**kwargs)
+    #     #self.hod.profile.is_hod = True
 
 
 class Faculty(models.Model):
@@ -71,10 +71,27 @@ class Student(models.Model):
     uid = models.BigAutoField(primary_key=True)
     profile = models.OneToOneField(UserProfile,on_delete=models.CASCADE,related_name='student')
     joined_year = models.IntegerField()
-    class_field = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='student')
+    class_field = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='student',null = True, blank = True)
     batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='students', null=True, blank=True)
     def __str__(self):
         return self.profile.name
+    def save(self, *args, **kwargs):
+        super().save(*args,**kwargs)
+        lecs = Lecture.objects.filter(class_field = self.class_field)
+        labs = Lab.objects.filter(batch = self.batch)
+        for lec in lecs:
+            LecAttendance.objects.create(
+                sid = self,
+                lecid = lec,
+            )
+        for lab in labs:
+            LabAttendance.objects.create(
+                sid = self,
+                labid = lab,
+            )
+
+        
+
 
 class Course(models.Model):
     cid = models.AutoField(primary_key=True)
