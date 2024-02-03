@@ -24,8 +24,14 @@ urlpatterns = [
     # Timetables
     path('timetables/', views.getTimeTables, name='get-timetables'),
     path('timetables/<int:pk>/', views.crudTimetable, name='crud-timetable'),
-    path('timetables/<int:pk>/leclabs/<int:lec_lab>/', views.getLecLabsPerCourseinTT, name='crud-timetable'),
+    path('timetables/<int:pk>/leclabs/<int:lec_lab>/', views.getLecLabsPerCourseinTT, name='lec-labs-per-course-in-tt'),
+    path('timetables/<int:pk>/leclabs/total/<int:lec_lab>/', views.getTotalLecLabsPerCourseinTT, name='count-lec-labs-per-course-in-tt'),
     path('timetables/create/', views.createTimeTable, name='create-timetable'),
+    
+    # Timetable Slots
+    path('slots/', views.getTimeTableSlots, name='get-slots'),
+    path('slots/<int:pk>/', views.crudTimeTableSlot, name='crud-slot'),
+    path('slots/create/', views.createTimeTableSlot, name='create-slot'),
     
     # Profiles
     path('profiles/', views.getProfiles, name='get-profiles'),
@@ -51,16 +57,16 @@ urlpatterns = [
     path('lectures/', views.getLectures, name='get-lectures'),
     path('lectures/<int:pk>/', views.crudlec, name='crud-lecture'),
     path('lectures/create/', views.createLecture, name='create-lecture'),
+    path('lectures/cancel/', views.crudLecsConditional, name='cud-lecs-c'),
+
 
     # Labs
     path('labs/', views.getLabs, name='get-labs'),
     path('labs/<int:pk>/', views.crudExtraLab, name='crud-lab'),
     path('labs/create/', views.createLab, name='create-lab'),
+    path('labs/cancel/', views.crudLabsConditional, name='cud-labs-c'),
 
-    # Timetable Slots
-    path('slots/', views.getTimeTableSlots, name='get-slots'),
-    path('slots/<int:pk>/', views.crudTimeTableSlot, name='crud-slot'),
-    path('slots/create/', views.createTimeTableSlot, name='create-slot'),
+   
 
     # Enrollments
     path('enrollments/', views.getEnrollments, name='get-enrollments'),
@@ -74,6 +80,7 @@ urlpatterns = [
    # LecAttendances
     path('lecattendances/', views.getLecAttendances, name='get-lec-attendances'),
     path('lecattendances/markatt/', views.crudLecAttendance, name='crud-lec-attendance'),
+    path('lecattendances/getPercent/<int:pk>/<int:lec_lab>/', views.getPercentAttendanceofStudentinaCourseLecs, name='percent-attedance-lecs'),
     path('lecattendances/create/', views.createLecAttendance, name='create-lec-attendance'),
     
     
