@@ -56,13 +56,34 @@ class UserProfileTests(APITestCase):
 "phone": 123456789,
 "date_of_birth": "2004-03-28"
 },
+
 "StudentInfo":{
 "joined_year":2022,
 "class_field":1,
 "batch":1
 }
+}
+
+
+{
+"UserInfo":{
+"username":"ccnfaculty",
+"email":"ccnfac@nav.in",
+"password": "ccnfac@Nav"
+},
+"ProfileInfo":{
+"name":"CCN Faculty",
+"email":"ccnfac@nav.in",
+"phone": 123456789,
+"date_of_birth": "2024-03-21"
+},
+
+"FacultyInfo":{
+  "department": 2
+}
 
 }
+
 
 Dept
 {
@@ -102,6 +123,19 @@ TimeTable
  "semester":4,
  "valid_from": "2024-01-15",
  "valid_till": "2024-05-09",
+}
+
+TimeTableSlot
+{
+ "ttid" : 2,
+ "day" : 1,
+ "start_time": "09:00",
+ "end_time":"10:00",
+ "faculty": 6,
+ "course":2,
+ "lec_lab":1,
+ "batch":null
+
 }
 
 

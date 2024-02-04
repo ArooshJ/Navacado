@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User, Group
 from datetime import timedelta
+from django.db.models import *
 
 
 # Create your models here. aj@Nav
@@ -76,19 +77,24 @@ class Student(models.Model):
     def __str__(self):
         return self.profile.name
     def save(self, *args, **kwargs):
-        super().save(*args,**kwargs)
+     if self.id == None:
+       super().save(*args,**kwargs)
+       if self.class_field:
         lecs = Lecture.objects.filter(class_field = self.class_field)
-        labs = Lab.objects.filter(batch = self.batch)
         for lec in lecs:
             LecAttendance.objects.create(
                 sid = self,
                 lecid = lec,
             )
+       if self.batch:
+        labs = Lab.objects.filter(batch = self.batch)
         for lab in labs:
             LabAttendance.objects.create(
                 sid = self,
                 labid = lab,
             )
+     else: 
+        super().save(*args,**kwargs)
 
         
 
@@ -106,49 +112,6 @@ class Enrollment(models.Model):
     id = models.AutoField(primary_key=True)
     cid = models.ForeignKey(Course,on_delete= models.CASCADE)
     sid = models.ForeignKey(Student,on_delete=models.CASCADE)
-
-
-class Lecture(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    course = models.ForeignKey(Course, related_name='lectures',on_delete=models.CASCADE,null=True)
-    class_field = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='lectures',null=True)
-    faculty = models.ForeignKey(Faculty, related_name='lectures',on_delete=models.SET_NULL,null=True)
-    date = models.DateField()
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    room = models.IntegerField(null=True,blank=True)
-    def save(self,*args,**kwargs):
-        super().save(*args,**kwargs)
-        classList = Student.objects.filter(class_field = self.class_field)
-        for s in classList:
-            # print(s.profile.name)
-            LecAttendance.objects.create(
-                sid = s,
-                lecid = self,
-            )
-    def __str__(self):
-            Days = {1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',7:'Sun'}
-            return f"{self.course}, {self.class_field}, {self.date}, {self.start_time}"
-
-
-class Lab(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    course = models.ForeignKey(Course, related_name='labs',on_delete=models.CASCADE,null=True)
-    batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='labs', null=True, blank=True)
-    faculty = models.ForeignKey(Faculty, related_name='labs',on_delete=models.SET_NULL,null=True)
-    date = models.DateField()
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    room = models.IntegerField(null = True, blank= True)
-    def save(self,*args,**kwargs):
-        super().save(*args,**kwargs)
-        batchList = Student.objects.filter(batch = self.batch)
-        for s in batchList:
-            print(s.profile.name)
-            LabAttendance.objects.create(
-                sid = s,
-                labid = self,
-            )
 
 class Timetable(models.Model):
     id = models.AutoField(primary_key=True)
@@ -173,7 +136,8 @@ class TimeTableSlot(models.Model):
         Days = {1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',7:'Sun'}
         return f"{self.course}, {Days[self.day]}, {self.start_time}"
     def save(self, *args, **kwargs):
-        super().save(self,*args,**kwargs)
+     if self.id == None:
+        super().save(*args,**kwargs)
         print('saved self')
         if self.ttid.valid_from and self.ttid.valid_till:
             current_date = self.ttid.valid_from
@@ -186,7 +150,7 @@ class TimeTableSlot(models.Model):
                     date=current_date,
                     start_time=self.start_time,
                     end_time=self.end_time,
-                    
+                    slot = self
                 )
                 print('creating lec\n')
                 print(f"Current date: {current_date}, Valid till: {self.ttid.valid_till}")
@@ -200,7 +164,7 @@ class TimeTableSlot(models.Model):
                     date=current_date,
                     start_time=self.start_time,
                     end_time=self.end_time,
-                    
+                    slot = self
                 )
                 print('creating lab')
                 current_date += timedelta(days=7)
@@ -209,9 +173,91 @@ class TimeTableSlot(models.Model):
 
                 # Increment current_date by 7 days for the next week
             current_date += timedelta(days=7)
-
+     else:
+         oldday = self.day
+         super().save(*args,**kwargs)
+         newday = self.day
+         print(newday - oldday)
+       #timecons = Q(date__gte = self.ttid__valid_from) and Q(date__lte = self.ttid__valid_till)
+         if self.lec_lab:
+            lecs = Lecture.objects.filter(slot = self)
+            for lec in lecs:
+               lec.course = self.course
+               lec.faculty = self.faculty
+               lec.start_time = self.start_time
+               lec.end_time = self.end_time
+               daychange = newday - oldday
+               if daychange < 0 : daychange += 7
+               lec.date+= timedelta(days = daychange)
+               lec.save()
+         else:
+            labs = Lab.objects.filter(slot = self)
+            for lec in labs:
+               lec.course = self.course
+               lec.faculty = self.faculty
+               lec.start_time = self.start_time
+               lec.end_time = self.end_time
+               lec.batch = self.batch
+               daychange = newday - oldday
+               if daychange < 0 : daychange += 7
+               lec.date+= timedelta(days = daychange)
+               lec.save()
+ 
+         
          
 
+
+class Lecture(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    course = models.ForeignKey(Course, related_name='lectures',on_delete=models.CASCADE,null=True)
+    class_field = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='lectures',null=True)
+    faculty = models.ForeignKey(Faculty, related_name='lectures',on_delete=models.SET_NULL,null=True)
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    room = models.IntegerField(null=True,blank=True) 
+    slot = models.ForeignKey(TimeTableSlot, on_delete = models.CASCADE, null = True, blank = True)
+    def save(self,*args,**kwargs):
+      if self.id == None:
+        super().save(*args,**kwargs)
+        classList = Student.objects.filter(class_field = self.class_field)
+        for s in classList:
+            # print(s.profile.name)
+            LecAttendance.objects.create(
+                sid = s,
+                lecid = self,
+            )
+      else:
+          super().save(*args,*kwargs)
+    def __str__(self):
+            Days = {1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',7:'Sun'}
+            return f"{self.course}, {self.class_field}, {self.date}, {self.start_time}"
+
+
+class Lab(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    course = models.ForeignKey(Course, related_name='labs',on_delete=models.CASCADE,null=True)
+    batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='labs', null=True, blank=True)
+    faculty = models.ForeignKey(Faculty, related_name='labs',on_delete=models.SET_NULL,null=True)
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    room = models.IntegerField(null = True, blank= True)
+    slot = models.ForeignKey(TimeTableSlot, on_delete = models.CASCADE, null = True, blank = True)
+
+    def save(self,*args,**kwargs):
+     if self.id == None:
+        super().save(*args,**kwargs)
+        batchList = Student.objects.filter(batch = self.batch)
+        for s in batchList:
+            print(s.profile.name)
+            LabAttendance.objects.create(
+                sid = s,
+                labid = self,
+            )
+     else:
+         super().save(*args,**kwargs)
+ 
 
 
 class LecAttendance(models.Model):
@@ -226,3 +272,4 @@ class LabAttendance(models.Model):
     labid = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='attendance')
     present = models.BooleanField(default=False)
 
+# alter table table_name auto_increment = 1;
