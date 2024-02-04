@@ -77,10 +77,10 @@ urlpatterns = [
     path('labattendances/markatt/', views.MarkLabAttendance, name='crud-lab-attendance'),
     path('labattendances/create/', views.createLabAttendance, name='create-lab-attendance'),
    
+    path('attendances/getPercent/<int:pk>/<int:lec_lab>/', views.getPercentAttendanceofStudentinaCourseLecs, name='percent-attedance-lecs'),
    # LecAttendances
     path('lecattendances/', views.getLecAttendances, name='get-lec-attendances'),
     path('lecattendances/markatt/', views.crudLecAttendance, name='crud-lec-attendance'),
-    path('lecattendances/getPercent/<int:pk>/<int:lec_lab>/', views.getPercentAttendanceofStudentinaCourseLecs, name='percent-attedance-lecs'),
     path('lecattendances/create/', views.createLecAttendance, name='create-lec-attendance'),
     
     

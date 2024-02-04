@@ -82,9 +82,9 @@ def createUserProfile(request):
         print('profile created')
         if (request.data.get("FacultyInfo")):
            fac_data = request.data.get("FacultyInfo")
-           fac_data['profile'] = UserProfile.id
+           fac_data['profile'] = upi.profileid
            fac = FacultySerializer(data =fac_data)
-           fac['profile'] = upi.profileid
+           #fac['profile'] = upi.profileid
            if fac.is_valid():
               fac.save()
               print('faculty created')
@@ -638,10 +638,45 @@ def getLectures(request):
       filters['date'] = date_object
     except ValueError as e:
        return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
+  
+   if('from' in request.query_params):
+    try:
+      d = request.query_params.get('from')
+      date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      filters['date__gte'] = date_object
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
+   
+   if('to' in request.query_params):
+    try:
+      d = request.query_params.get('to')
+      date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      filters['date__lte'] = date_object
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
+   
+   if('course' in request.query_params):
+    try:
+      d = request.query_params.get('course')
+      #date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      filters['course'] = d
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
+   
+   if('slot' in request.query_params):
+    try:
+      d = request.query_params.get('slot')
+      #date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      filters['slot'] = d
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
+   
    if('start' in request.query_params):
     try:
       d = request.query_params.get('start')
+      #print(d)
       time_object = datetime.strptime(d, '%H:%M').time()
+     #-  print(time_object)
       filters['start_time'] = time_object
     except ValueError as e:
        return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
@@ -754,6 +789,21 @@ def getLabs(request):
       d = request.query_params.get('start')
       time_object = datetime.strptime(d, '%H:%M').time()
       filters['start_time'] = time_object
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
+   if('from_date' in request.query_params):
+    try:
+      d = request.query_params.get('from_date')
+      date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      filters['date__gte'] = date_object
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
+   
+   if('to_date' in request.query_params):
+    try:
+      d = request.query_params.get('to_date')
+      date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      filters['date__lte'] = date_object
     except ValueError as e:
        return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
    Labs = Lab.objects.filter(**filters)
@@ -929,6 +979,21 @@ def getLabAttendance(request):
       Filters['labid'] = int(s)
     except ValueError:
        return Response("Invalid lab id. It should be an integer.", status=400)
+   if('from_date' in request.query_params):
+    try:
+      d = request.query_params.get('from_date')
+      date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      Filters['labid__date__gte'] = date_object
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
+   
+   if('to_date' in request.query_params):
+    try:
+      d = request.query_params.get('to_date')
+      date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      Filters['labid__date__lte'] = date_object
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
    LabAttendances = LabAttendance.objects.filter(**Filters)
    serializer = LabAttendanceSerializer(LabAttendances,many=True)
    return Response(serializer.data) # get attendance of all students in a particular lab
@@ -1007,7 +1072,7 @@ def crudTT():
    pass
 
 @api_view(['POST'])
-@permission_classes([IsClassInchargeOrHod])
+@permission_classes([IsAuthenticated])
 def createTimeTable(request):
  try:
    profile = request.user.userprofile
@@ -1103,7 +1168,7 @@ def createTimeTableSlot(request):
  try:
    profile = request.user.userprofile
    TimeTableSlot = TimeTableSlotSerializer(data = request.data)
-   permission = profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == TimeTableSlot.timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == TimeTableSlot.timetable.class_field)))
+   permission = request.user.is_superuser or (profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == TimeTableSlot.timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == TimeTableSlot.timetable.class_field))))
    if not permission:
            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
    if TimeTableSlot.is_valid():
@@ -1123,7 +1188,7 @@ def crudTimeTableSlot(request,pk):
         return Response(serializer.data)
       if request.method == 'DELETE':
          #permission
-         permission = profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == timeTableSlot.timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == timeTableSlot.timetable.class_field)))
+         permission = request.user.is_superuser or (profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == timeTableSlot.timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == timeTableSlot.timetable.class_field))))
          if not permission:
            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
     
@@ -1131,7 +1196,7 @@ def crudTimeTableSlot(request,pk):
          return Response({'message': 'timeTableSlot deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
       if request.method in ['PUT','PATCH']:
          #permission
-         permission = profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == timeTableSlot.timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == timeTableSlot.timetable.class_field)))
+         permission = request.user.is_superuser or (profile and (profile.faculty and ((profile.faculty.hod and profile.faculty.hod == timeTableSlot.timetable.class_field.department) or (profile.faculty.incharge and profile.faculty.incharge == timeTableSlot.timetable.class_field))))
          if not permission:
            return Response({'error': 'You are not allowed to perform this action'}, status=status.HTTP_403_FORBIDDEN)
            
@@ -1218,18 +1283,11 @@ def getTotalLecLabsPerCourseinTT(request,pk,lec_lab):
 
 @api_view(['GET'])
 def getPercentAttendanceofStudentinaCourseLecs(request,pk,lec_lab):
-   
    filters = {}
    AttFilters ={}
    tt = Timetable.objects.get(pk=pk)
-   dateCondition = Q(date__gte = tt.valid_from) and Q(date__lte = tt.valid_till)
-   #print('good till condition')
-   lecsWithinthisTT = Lecture.objects.filter(dateCondition)
-   labsWithinthisTT = Lab.objects.filter(dateCondition)
-   LeccoursesInThisTT = lecsWithinthisTT.values('course').distinct() 
-   print(LeccoursesInThisTT)
-   LabcoursesInThisTT = labsWithinthisTT.values('course').distinct() 
-   #print('err here?')
+   from_date = tt.valid_from
+   to_date = tt.valid_till
    if('course' in request.query_params):
     try:
       c = request.query_params['course']
@@ -1243,13 +1301,43 @@ def getPercentAttendanceofStudentinaCourseLecs(request,pk,lec_lab):
         AttFilters['sid'] = int(s)
        except ValueError:
         return Response("Invalid student id. It should be an integer.", status=400)
+   if('from_date' in request.query_params):
+    try:
+      d = request.query_params.get('from_date')
+      date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      from_date = date_object
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
+   if('to_date' in request.query_params):
+    try:
+      d = request.query_params.get('to_date')
+      date_object = datetime.strptime(d, '%d-%m-%Y').date()
+      to_date = date_object
+    except ValueError as e:
+       return Response({'error':str(e)},status= status.HTTP_403_FORBIDDEN)
    
+   
+   
+   dateCondition = Q(date__gte = from_date) and Q(date__lte = to_date)
+   #print('good till condition')
+   lecsWithinthisTT = Lecture.objects.filter(dateCondition)
+   labsWithinthisTT = Lab.objects.filter(dateCondition)
+   LeccoursesInThisTT = lecsWithinthisTT.values('course').distinct() 
+   #print(LeccoursesInThisTT)
+   LabcoursesInThisTT = labsWithinthisTT.values('course').distinct() 
+   #print('err here?')
+   lecslotsinThistt = TimeTableSlot.objects.filter(ttid = tt.id, lec_lab =1).values('course').distinct()
+   labslotsinThistt = TimeTableSlot.objects.filter(ttid = tt.id, lec_lab =0).values('course').distinct()
+   
+
    # 1 = lec, lab = 0
    if(lec_lab == 1):
     Data = []
-    for c in LeccoursesInThisTT:
+    for c in lecslotsinThistt:
+      #print(c)
+      
       lecscount = lecsWithinthisTT.values('course').annotate(lec_count =  Count(id))
-      lecsofCourse = lecsWithinthisTT.filter()
+      lecsofCourse = lecsWithinthisTT.filter(course = c['course'])
       lecAttsofCourse = LecAttendance.objects.filter(lecid__in = lecsofCourse)
       lecAttsofStudentinCourse = lecAttsofCourse.filter(**AttFilters)
       TotalAttended = lecAttsofStudentinCourse.filter(present = True).count()
@@ -1260,14 +1348,14 @@ def getPercentAttendanceofStudentinaCourseLecs(request,pk,lec_lab):
       Data.append(AttendacneStats)
        
 
-
+    
     serializer = LecAttendacnceStatSerializer(Data,many=True)
      # print('err here')
     return Response(serializer.data)
    
    elif(lec_lab == 0):
     Data = []
-    for c in LabcoursesInThisTT:
+    for c in labslotsinThistt:
       if('batch' in request.query_params):
         try:
          b = request.query_params['batch']
@@ -1276,7 +1364,7 @@ def getPercentAttendanceofStudentinaCourseLecs(request,pk,lec_lab):
           return Response("Invalid student id. It should be an integer.", status=400)
      
       op = labsWithinthisTT.filter(batch = int(b)).values('course').annotate(lab_count = Count(id))
-      labsofCourse = labsWithinthisTT.filter(**filters)
+      labsofCourse = labsWithinthisTT.filter(course = c['course'])
       labAttsofCourse = LabAttendance.objects.filter(labid__in = labsofCourse)
       labAttsofStudentinCourse = labAttsofCourse.filter(**AttFilters)
       TotalAttended = labAttsofStudentinCourse.filter(present = True).count()
