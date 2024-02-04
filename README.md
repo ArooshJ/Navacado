@@ -4,4 +4,6 @@ This System allows Automatic creation of Lectures and Labs based on the informat
 
 Based on this data, the system calculates the total lecs attended, percentage attendance of any student in lectures during a timetable, or within a specific time periods, for specific courses, etc based on the data in the database.
 
+Beisdes this, there are views for CRUD for each model mention in the first para. Attempt has been made to manage permissions for each view, where certain crud privileges are given to faculties, hods, class incharges, course heads and superusers
+
 The System is currently a restAPI created completely using django REST framework while the database used for testing is a local MySQL database.
