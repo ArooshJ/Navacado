@@ -1,0 +1,22 @@
+# Ignore Python bytecode files
+*.pyc
+__pycache__/
+
+# Ignore virtual environment folders
+base/
+.env/
+Lib/
+
+# Ignore pip dependency files
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Ignore Django migration files
+*/migrations/*
+
+# Ignore logs and database files
+*.log
+*.sqlite3
+
+/Scripts/
+/Navacado/Scripts/
