@@ -1,0 +1,142 @@
+{
+    # Department
+    "dname": "name"
+}
+
+
+# User + UserProfile
+{
+   "UserInfo":{
+          "username*":"john_doe", "email":"john@example.com", "password*":"AJ@Nav"
+   },
+
+  "ProfileInfo":{
+         "name*": "",
+    "email":"",
+    "phone":"",
+    "date_of_birth*":"YYYY-MM-DD"
+    
+  } ,
+ 
+  
+  "FacultyInfo":{
+       "Department":"",
+  },
+
+  "StudentInfo":{
+     "joined_year":"",
+     "class_field":"",
+     "batch":"",
+  },
+
+
+
+
+}
+
+"FacultyInfo":
+{
+       "Department":"",
+       "profile": ,
+}
+
+  "StudentInfo":
+  {  
+    "profile":  
+     "joined_year":"",
+     "class_field":"",
+     "batch":"",
+  }  
+
+Timetable
+  {
+    "class_field": 1,
+    "semester": 1,
+    "valid_from": "2023-01-01",
+    "valid_till": "2023-06-01"
+}
+
+Course
+{
+    "cname": "Introduction to Programming",
+    "semester": 1,
+    "head": 1,
+    "department": 1
+}
+
+TimeTableSlot Model
+{
+    "ttid": 1,
+    "day": 1,
+    "start_time": "09:00:00",
+    "end_time": "10:00:00",
+    "faculty": 1,
+    "course": 1,
+    "lec_lab": true,
+    "batch": 1
+}
+
+Batch
+{
+    "bname": "Batch A",
+    "class_field": 1,
+    "br": 1
+}
+
+Class
+{
+    "department": 1,
+    "year": 2023,
+    "division": "A",
+    "acad_year": "2023-2024",
+    "incharge": 1,
+    "cr": 1
+}
+
+Lecture
+{
+  "course": 1, 
+  "class_field": 1,
+  "faculty": 1,
+  "date": "2023-10-01", 
+  "start_time": "09:00:00",  
+  "end_time": "10:00:00",  
+  "room": 101, 
+  "slot": 1  
+}
+
+
+Lab
+{
+  "course": 1,  
+  "batch": 1,  
+  "faculty": 1,  
+  "date": "2023-10-01",  
+  "start_time": "10:00:00",  
+  "end_time": "12:00:00", 
+  "room": 102,
+  "slot": 1  
+}
+
+LecAttendance
+{
+    "sid": 1,
+    "lecid": 101,
+    "present": true
+}
+
+LabAttendance
+{
+    "sid": 1,
+    "labid": 101,
+    "present": true
+}
+
+# Login (JWT) to /api/token/
+{
+     "username":"",
+     "password":"", 
+}
+
+AJ2 securepassword123
+AJ7 aj7@Nav
