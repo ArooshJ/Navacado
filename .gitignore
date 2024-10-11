@@ -19,4 +19,5 @@ pip-delete-this-directory.txt
 *.sqlite3
 
 /Scripts/
-/Navacado/Scripts/
+/Navacado_api/Scripts/
+/Navacado_api/Lib/
